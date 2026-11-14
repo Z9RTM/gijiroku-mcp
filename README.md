@@ -1,6 +1,6 @@
 # gijiroku-mcp
 
-Claude DesktopやChatGPTデスクトップのチャットからAIに頼むだけで、会議の録音開始から文字起こし、議事録の作成までを済ませるためのローカルMCPサーバーです。MCP Appsの操作画面も同梱しています。音声認識はRustサーバーから起動する同梱のspeech.cppが端末内で行います（Apple Silicon Mac専用）。
+Claude DesktopやChatGPTデスクトップのチャットからAIに頼むだけで、会議の録音開始から文字起こし、議事録の作成までを済ませるためのローカルMCPサーバーです（Apple Silicon Mac専用）。MCP Appsの操作画面も同梱しています。音声認識はRustサーバーから起動する同梱のspeech.cppが端末内で行います。
 
 ## 使い方
 
