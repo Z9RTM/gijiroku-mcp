@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "gijiroku-mcp",
-  "description": "Local Japanese meeting transcription that ChatGPT turns into minutes, with interactive controls. Apple Silicon Mac only.",
+  "description": "Local Japanese meeting transcription that ChatGPT turns into minutes, with interactive controls. macOS only.",
   "author": {"name": "gijiroku-mcp contributors"},
   "extensions": {
     "com.openai": {
@@ -9,7 +9,7 @@
       "interface": {
         "displayName": "gijiroku-mcp",
         "shortDescription": "会議を端末内で文字起こしし、そのまま議事録に",
-        "longDescription": "Apple Silicon Mac上でマイク音声を日本語に文字起こしします。モデル準備、録音開始・停止、状態取得、文字起こしの読み取り、更新待機とMCP Appsの操作画面を提供します。インストールや画面表示だけでは録音しません。",
+        "longDescription": "Mac上でマイク音声を日本語に文字起こしします。モデル準備、録音開始・停止、状態取得、文字起こしの読み取り、更新待機とMCP Appsの操作画面を提供します。インストールや画面表示だけでは録音しません。",
         "developerName": "gijiroku-mcp contributors",
         "category": "Productivity",
         "capabilities": ["Interactive"],
