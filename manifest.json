@@ -1,0 +1,70 @@
+{
+  "manifest_version": "0.3",
+  "name": "gijiroku-mcp",
+  "display_name": "gijiroku-mcp",
+  "version": "0.6.0",
+  "description": "Local Japanese meeting transcription that Claude turns into minutes, with an MCP Apps control panel. Recording continues until stopped or disconnected.",
+  "author": {
+    "name": "gijiroku-mcp contributors"
+  },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/gijiroku-mcp",
+    "mcp_config": {
+      "command": "${__dirname}/server/gijiroku-mcp",
+      "args": [
+        "${__dirname}/server/speech",
+        "${HOME}/Library/Application Support/gijiroku-mcp/claude",
+        "${HOME}/Library/Application Support/gijiroku-mcp/models"
+      ]
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ]
+  },
+  "long_description": "Apple Silicon Mac only. No recording starts on installation. Ask Claude to start recording explicitly; check recording_status for models, process outcomes and recent transcript. After starting model preparation, use wait_for_update with the returned revision until models.ready=true. The same tool monitors live transcript changes; timeouts do not imply completion. Use read_recording for raw events. prepare_models downloads missing models into ~/Library/Application Support/gijiroku-mcp/models. Transcripts and engine logs are saved under ~/Library/Application Support/gijiroku-mcp/claude. Includes an MCP Apps control panel for model preparation, recording controls and live text. Ask Claude to open gijiroku-mcp. Text-only clients retain all existing tools. Opening the panel never starts recording. This experimental bundle is not Developer ID signed or notarized.",
+  "tools": [
+    {
+      "name": "prepare_models",
+      "description": "Download required models, then follow wait_for_update until ready"
+    },
+    {
+      "name": "start_recording",
+      "description": "Record and transcribe continuously until stopped"
+    },
+    {
+      "name": "stop_recording",
+      "description": "Stop recording or model preparation"
+    },
+    {
+      "name": "recording_status",
+      "description": "Inspect model download progress, process outcome and live transcript summary"
+    },
+    {
+      "name": "list_recordings",
+      "description": "List saved transcription sessions across connections, including live recordings"
+    },
+    {
+      "name": "read_recording",
+      "description": "Read recording events by selected ID, or this connection's latest recording"
+    },
+    {
+      "name": "read_transcript",
+      "description": "Read a whole recording at once as plain text with timestamps and speaker labels"
+    },
+    {
+      "name": "list_microphones",
+      "description": "List the microphones start_recording can choose"
+    },
+    {
+      "name": "wait_for_update",
+      "description": "Wait up to 20 seconds for status or live transcript changes"
+    },
+    {
+      "name": "open_gijiroku",
+      "description": "Open the interactive controls and live transcription panel without starting recording"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "gijiroku-mcp",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "scripts": {
+    "test": "node --test ui/transcript.test.js scripts/prepare-backend.test.mjs",
+    "backend:prepare": "node scripts/prepare-backend.mjs",
+    "mcp:app:build": "node scripts/build-mcp-app.mjs",
+    "mcp:pack": "node scripts/pack-mcpb.mjs",
+    "mcp:test": "pnpm run mcp:app:build && cargo test --locked && cargo build --locked && node --test scripts/mcp-server.test.mjs scripts/mcp-app.test.mjs",
+    "chatgpt:pack": "node scripts/pack-chatgpt-plugin.mjs",
+    "chatgpt:test": "node --test scripts/chatgpt-plugin.test.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.4",
+    "esbuild": "0.28.2"
+  }
+}

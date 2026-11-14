@@ -1,0 +1,10 @@
+node_modules/
+target/
+binaries/
+ui/dist/
+dist-mcp/
+dist-chatgpt/
+docs/
+experiments/
+.DS_Store
+.superpowers/
