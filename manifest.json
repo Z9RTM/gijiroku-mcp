@@ -16,15 +16,26 @@
         "${__dirname}/server/speech",
         "${HOME}/Library/Application Support/gijiroku-mcp/claude",
         "${HOME}/Library/Application Support/gijiroku-mcp/models"
-      ]
+      ],
+      "platform_overrides": {
+        "win32": {
+          "command": "${__dirname}/server/gijiroku-mcp.exe",
+          "args": [
+            "${__dirname}/server/speech.exe",
+            "${HOME}/AppData/Local/gijiroku-mcp/claude",
+            "${HOME}/AppData/Local/gijiroku-mcp/models"
+          ]
+        }
+      }
     }
   },
   "compatibility": {
     "platforms": [
-      "darwin"
+      "darwin",
+      "win32"
     ]
   },
-  "long_description": "macOS only. No recording starts on installation. Ask Claude to start recording explicitly; check recording_status for models, process outcomes and recent transcript. After starting model preparation, use wait_for_update with the returned revision until models.ready=true. The same tool monitors live transcript changes; timeouts do not imply completion. Use read_recording for raw events. prepare_models downloads missing models into ~/Library/Application Support/gijiroku-mcp/models. Transcripts and engine logs are saved under ~/Library/Application Support/gijiroku-mcp/claude. Includes an MCP Apps control panel for model preparation, recording controls and live text. Ask Claude to open gijiroku-mcp. Text-only clients retain all existing tools. Opening the panel never starts recording. This experimental bundle is not Developer ID signed or notarized.",
+  "long_description": "For Apple Silicon Macs and Windows x64. No recording starts on installation. Ask Claude to start recording explicitly; check recording_status for models, process outcomes and recent transcript. After starting model preparation, use wait_for_update with the returned revision until models.ready=true. The same tool monitors live transcript changes; timeouts do not imply completion. Use read_recording for raw events. prepare_models downloads missing models into gijiroku-mcp/models, and transcripts and engine logs are saved under gijiroku-mcp/claude, both in ~/Library/Application Support on macOS and %LOCALAPPDATA% on Windows. Includes an MCP Apps control panel for model preparation, recording controls and live text. Ask Claude to open gijiroku-mcp. Text-only clients retain all existing tools. Opening the panel never starts recording. This experimental bundle is not code signed.",
   "tools": [
     {
       "name": "prepare_models",

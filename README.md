@@ -10,14 +10,17 @@ gijiroku-mcpは3つの部品でできていて、部品ごとに対応するOS�
 | --- | --- | --- |
 | Rustサーバー（`src/main.rs`） | stdioのMCPサーバー。speech.cppとデータの場所を起動引数で受け取ります | macOS、Linux、Windows |
 | speech.cpp（[Z9RTM/speech.cpp](https://github.com/Z9RTM/speech.cpp)） | 音声認識とマイク入力 | macOS（Metal）、Linux（Vulkan / CPU）、Windows（Vulkan） |
-| パッケージ作成（`scripts/`） | speech.cppのビルドと、MCPB・プラグインZIPの作成 | macOS（Apple Silicon） |
+| パッケージ作成（`scripts/`） | speech.cppのビルドと、MCPB・プラグインZIPの作成 | macOS（Apple Silicon）、Windows（x64） |
 
 Rustサーバーは、`x86_64-apple-darwin`、`aarch64-apple-darwin`、`x86_64-unknown-linux-gnu`、`aarch64-unknown-linux-gnu`、`x86_64-pc-windows-msvc` 向けにコンパイルできます。
 
 | 環境 | 配布パッケージ | 使い方 |
 | --- | --- | --- |
 | macOS（Apple Silicon） | MCPB、ChatGPTプラグインZIP | パッケージをインストールします |
-| macOS（Intel）、Linux、Windows | なし | [ソースからビルドして使う](#ソースからビルドして使う)。実機での動作はまだ確認していません |
+| Windows（x64） | MCPB、ChatGPTプラグインZIP | パッケージをインストールします。GPUドライバーのVulkanが必要です。実機での動作はまだ確認していません |
+| macOS（Intel）、Linux | なし | [ソースからビルドして使う](#ソースからビルドして使う)。実機での動作はまだ確認していません |
+
+配布パッケージは、GitHub Actionsの `package` ワークフローがOSごとに作り、実行結果のArtifactsに `gijiroku-mcp-darwin-arm64` と `gijiroku-mcp-windows-x64` として置きます。
 
 ホストアプリ（Claude Desktop、ChatGPTデスクトップ）がどのOSで動くかは、それぞれのアプリに従います。
 
@@ -129,11 +132,11 @@ FASTDIARは1フレームに1話者しか付けないため、重なった発話�
 
 保存先は、サーバーの2つ目の引数（録音とログ）と3つ目の引数（モデル）で決まります。配布パッケージは次の場所を使います。
 
-| 内容 | 場所 |
-| --- | --- |
-| モデル（両ホスト共通） | `~/Library/Application Support/gijiroku-mcp/models` |
-| Claude Desktopの録音・ログ | `~/Library/Application Support/gijiroku-mcp/claude` |
-| ChatGPTの録音・ログ | `~/Library/Application Support/gijiroku-mcp/chatgpt` |
+| 内容 | macOS | Windows |
+| --- | --- | --- |
+| モデル（両ホスト共通） | `~/Library/Application Support/gijiroku-mcp/models` | `%LOCALAPPDATA%\gijiroku-mcp\models` |
+| Claude Desktopの録音・ログ | `~/Library/Application Support/gijiroku-mcp/claude` | `%LOCALAPPDATA%\gijiroku-mcp\claude` |
+| ChatGPTの録音・ログ | `~/Library/Application Support/gijiroku-mcp/chatgpt` | `%LOCALAPPDATA%\gijiroku-mcp\chatgpt` |
 
 モデルは初回の `prepare_models` で各配布元から取得します。リポジトリやバンドルには含まれず、各モデルの配布元のライセンスに従います。
 
@@ -195,14 +198,14 @@ FASTDIARは1フレームに1話者しか付けないため、重なった発話�
 
 ## 開発・ビルド
 
-ここのコマンドは、配布パッケージを作るためのものです。パッケージ作成はmacOS（Apple Silicon）でだけ動き、Xcode Command Line Toolsも必要です。Rustのテストは `/bin/sleep` を使うので、Windowsでは動きません。
+ここのコマンドは、配布パッケージを作るためのものです。パッケージは実行したOS向けのものだけができます。macOS（Apple Silicon）ではXcode Command Line Tools、Windows（x64）ではVisual Studio 2022のC++ツールとVulkan SDKも必要です。`mcp:test` はUnixのプロセスを使うので、Windowsでは動きません。
 
 ```sh
 pnpm install
 pnpm test             # 文字起こしの整形とspeech.cppビルドスクリプトのテスト
 pnpm run mcp:test     # Rustサーバー、MCP Apps画面
-pnpm run mcp:pack     # dist-mcp/gijiroku-mcp-darwin-arm64.mcpb
-pnpm run chatgpt:pack # dist-chatgpt/gijiroku-mcp-darwin-arm64.zip
+pnpm run mcp:pack     # dist-mcp/gijiroku-mcp-<darwin-arm64|windows-x64>.mcpb
+pnpm run chatgpt:pack # dist-chatgpt/gijiroku-mcp-<darwin-arm64|windows-x64>.zip
 pnpm run chatgpt:test
 ```
 
@@ -212,10 +215,11 @@ pnpm run chatgpt:test
 | `ui/` | MCP Appsの画面。ビルド時に1つのHTMLにまとめ、Rustバイナリに埋め込みます |
 | `manifest.json` | MCPBのマニフェスト（[仕様](https://github.com/modelcontextprotocol/mcpb/blob/main/MANIFEST.md)） |
 | `chatgpt-plugin/` | ChatGPTプラグインの設定と起動スクリプト |
-| `scripts/` | ビルド、パッケージ作成、テスト |
+| `scripts/` | ビルド、パッケージ作成、テスト。OSごとの違いは `scripts/mcp-package.mjs` の `targets` にまとめています |
+| `.github/workflows/package.yml` | macOSとWindowsでテストし、パッケージを作るワークフロー |
 
 `cargo build` を直接実行する前には `pnpm run mcp:app:build` で画面をビルドしてください。パックとテストのコマンドは自動でこれを行います。バンドルの `licenses/` には、本体の `gijiroku-mcp-LICENSE`、speech.cppとggml、画面のSDKなど（`MCP-App-THIRD_PARTY_NOTICES.txt`）、Rustの依存クレート（`Rust-THIRD_PARTY_NOTICES.txt`、`Cargo.lock` から生成）のライセンスが入ります。
 
 パックするときは、FASTDIAR対応のspeech.cppフォーク（[Z9RTM/speech.cpp](https://github.com/Z9RTM/speech.cpp)）をソースからビルドし、`binaries/` に置いて同梱します。既定では、パックするたびに `main` ブランチの最新コミットを確認します。特定のコミットに固定するときは、`SPEECH_COMMIT` にその先頭7桁を指定します。対象のコミットかビルドスクリプトが変わったときだけ再ビルドします。コンパイラやSDKを変えたときは `binaries/` を削除してください。
 
-macOS向けの配布パッケージでは、サーバーとspeech.cppにDeveloper ID署名も公証もしていません。MCPBにも署名はありません。
+配布パッケージのサーバーとspeech.cppには、macOSのDeveloper ID署名と公証も、Windowsのコード署名もしていません。MCPBにも署名はありません。

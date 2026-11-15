@@ -34,14 +34,17 @@ cp.execFileSync = (command, args) => {
  }
  if (command === 'cmake' && args[0] === '--build') {
   if (process.env.TEST_BUILD_FAIL) throw Error('build failed');
-  writeFileSync(join(bin, 'speech'), 'binary');
+  writeFileSync(join(bin, process.env.TEST_PLATFORM === 'win32' ? 'speech.exe' : 'speech'), 'binary');
  }
 };
 syncBuiltinESMExports();
 await import(${JSON.stringify(script)});
 `;
 
-for (const platform of ['darwin']) {
+for (const [platform, file, backend] of [
+ ['darwin', 'speech-aarch64-apple-darwin', /GGML_METAL_EMBED_LIBRARY=ON/],
+ ['win32', 'speech-x86_64-pc-windows-msvc.exe', /GGML_VULKAN=ON","-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded/],
+]) {
  test(`${platform}: source build, commit validation and cache`, async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'gijiroku-prepare-test-'));
   const run = (commit, extra = {}) => {
@@ -50,7 +53,7 @@ for (const platform of ['darwin']) {
    if (commit !== undefined) env.SPEECH_COMMIT = commit;
    return spawnSync(process.execPath, ['--input-type=module', '-e', prelude], {cwd, encoding: 'utf8', env});
   };
-  const binary = join(cwd, 'binaries', 'speech-aarch64-apple-darwin');
+  const binary = join(cwd, 'binaries', file);
   try {
    let result = run();
    assert.equal(result.status, 0, result.stderr);
@@ -58,7 +61,7 @@ for (const platform of ['darwin']) {
    assert.match(result.stdout, /4d0278b1{33}\^\{commit\}/);
    assert.match(result.stdout, /"submodule","update","--init","--recursive"/);
    assert.match(result.stdout, /"--target","speech-cli"/);
-   assert.match(result.stdout, /GGML_METAL_EMBED_LIBRARY=ON/);
+   assert.match(result.stdout, backend);
    assert.equal(await readFile(binary, 'utf8'), 'binary');
    assert.equal(await readFile(join(cwd, 'licenses/ggml-LICENSE'), 'utf8'), 'ggml license');
    assert.doesNotMatch(run().stdout, /clone/, 'unchanged main reuses the build');

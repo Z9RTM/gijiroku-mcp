@@ -1,16 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, readFile, readdir, rm, stat} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, readdir, rm, stat} from 'node:fs/promises';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
+import {target, speechBinary} from './mcp-package.mjs';
 
 test('ChatGPT ZIP is self-contained and launches the shared MCP without recording', {timeout:15000}, async t => {
   const dir = await mkdtemp(join(tmpdir(), 'gijiroku plugin test '));
   t.after(() => rm(dir, {recursive:true, force:true}));
   const root = join(dir, 'plugin with spaces');
-  const archive = resolve('dist-chatgpt/gijiroku-mcp-darwin-arm64.zip');
-  execFileSync('/usr/bin/unzip', ['-q', archive, '-d', root]);
+  const archive = resolve(`dist-chatgpt/gijiroku-mcp-${target.name}.zip`);
+  await mkdir(root);
+  execFileSync(target.tar, ['-xf', archive, '-C', root]);
   const json = async path => JSON.parse(await readFile(path, 'utf8'));
   const manifest = await json(join(root, 'plugin.json'));
   const mcpb = await json('manifest.json');
@@ -22,12 +24,13 @@ test('ChatGPT ZIP is self-contained and launches the shared MCP without recordin
   assert.ok(openai.interface.shortDescription.length <= 30);
   assert.deepEqual((await readdir(root)).sort(), ['README.md', 'licenses', 'mcp.json', 'plugin.json', 'server']);
   for (const [packed, source] of [
-    ['server/gijiroku-mcp', 'target/release/gijiroku-mcp'],
-    ['server/speech', 'binaries/speech-aarch64-apple-darwin'],
+    [`server/gijiroku-mcp${target.exe}`, `target/release/gijiroku-mcp${target.exe}`],
+    [`server/speech${target.exe}`, speechBinary],
     ['licenses/MCP-App-THIRD_PARTY_NOTICES.txt', 'ui/dist/THIRD_PARTY_NOTICES.txt'],
     ['licenses/gijiroku-mcp-LICENSE', 'LICENSE'],
   ]) assert.deepEqual(await readFile(join(root, packed)), await readFile(source));
-  for (const binary of ['gijiroku-mcp', 'speech']) assert.ok((await stat(join(root, 'server', binary))).mode & 0o111);
+  assert.equal((await readdir(join(root, 'server'))).length, 3, 'only this OS\'s launcher');
+  if (process.platform !== 'win32') for (const binary of ['gijiroku-mcp', 'speech']) assert.ok((await stat(join(root, 'server', binary))).mode & 0o111);
   assert.ok((await readdir(join(root, 'licenses'))).includes('speech.cpp-LICENSE'));
   const rust = await readFile(join(root, 'licenses/Rust-THIRD_PARTY_NOTICES.txt'), 'utf8');
   for (const crate of ['serde_json', 'libc', 'itoa', 'memchr', 'zmij']) assert.match(rust, new RegExp(`^${crate} \\d`, 'm'), `${crate} license bundled`);
@@ -47,7 +50,7 @@ test('ChatGPT ZIP is self-contained and launches the shared MCP without recordin
     ['tools/call', {name:'open_gijiroku', arguments:{}}],
   ].map(([method, params], id) => JSON.stringify({jsonrpc:'2.0', id, method, params})).join('\n') + '\n';
   const child = spawnSync(server.command, server.args.map(expand), {
-    cwd:expand(server.cwd), env:{...process.env, HOME:home}, input:requests,
+    cwd:expand(server.cwd), env:{...process.env, HOME:home, LOCALAPPDATA:home}, input:requests,
     encoding:'utf8', timeout:10000, maxBuffer:4 * 1024 * 1024,
   });
   assert.ifError(child.error);
@@ -64,6 +67,7 @@ test('ChatGPT ZIP is self-contained and launches the shared MCP without recordin
   const status = responses[3].result.structuredContent;
   assert.equal(status.operation, 'idle');
   assert.equal(status.recording, null);
-  assert.equal(status.dataDirectory, join(home, 'Library/Application Support/gijiroku-mcp/chatgpt'));
-  assert.equal(status.modelDirectory, join(home, 'Library/Application Support/gijiroku-mcp/models'));
+  const appData = process.platform === 'win32' ? home : join(home, 'Library/Application Support');
+  assert.equal(status.dataDirectory, join(appData, 'gijiroku-mcp/chatgpt'));
+  assert.equal(status.modelDirectory, join(appData, 'gijiroku-mcp/models'));
 });
