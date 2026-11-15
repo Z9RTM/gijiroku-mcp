@@ -1,0 +1,53 @@
+name: package
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# Each OS builds its own packages natively: the Claude Desktop MCPB and the ChatGPT plugin ZIP share one server,
+# one speech.cpp build and one embedded UI per OS.
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: darwin-arm64
+          - os: windows-2025
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    env:
+      # Same SDK version and install as speech.cpp's own Windows build.
+      VULKAN_VERSION: 1.4.357.0
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install the Vulkan SDK
+        if: runner.os == 'Windows'
+        run: |
+          curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      # The Rust unit tests and the fake engine in mcp-server.test.mjs rely on Unix processes.
+      - if: runner.os == 'macOS'
+        run: pnpm run mcp:test
+      - run: pnpm run mcp:pack
+      - run: pnpm run chatgpt:pack
+      - run: pnpm run chatgpt:test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gijiroku-mcp-${{ matrix.target }}
+          path: |
+            dist-mcp/gijiroku-mcp-${{ matrix.target }}.mcpb
+            dist-chatgpt/gijiroku-mcp-${{ matrix.target }}.zip
+          if-no-files-found: error

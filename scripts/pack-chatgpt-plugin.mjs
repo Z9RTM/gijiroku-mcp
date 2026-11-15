@@ -1,21 +1,25 @@
 import {mkdir, mkdtemp, cp, readFile, writeFile, rm} from 'node:fs/promises';
-import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
-import {join, resolve} from 'node:path';
-import {buildMcpRuntime, copyMcpRuntime} from './mcp-package.mjs';
+import {basename, join, resolve} from 'node:path';
+import {buildMcpRuntime, copyMcpRuntime, target, zipDirectory} from './mcp-package.mjs';
 
 buildMcpRuntime();
 const stage = await mkdtemp(join(tmpdir(), 'gijiroku-chatgpt-'));
-const output = resolve('dist-chatgpt/gijiroku-mcp-darwin-arm64.zip');
+const output = resolve(`dist-chatgpt/gijiroku-mcp-${target.name}.zip`);
+const [command, ...args] = target.launch;
+const launcher = basename(args.at(-1));
 try {
   await copyMcpRuntime(stage);
-  await cp('chatgpt-plugin', stage, {recursive:true});
-  const manifest = JSON.parse(await readFile(join(stage, 'plugin.json'), 'utf8'));
-  const mcpb = JSON.parse(await readFile('manifest.json', 'utf8'));
-  manifest.version = mcpb.version;
-  await writeFile(join(stage, 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n');
+  await cp('chatgpt-plugin', stage, {recursive:true, filter: src => !/[\\/]launch\.\w+$/.test(src) || basename(src) === launcher});
+  const json = async path => JSON.parse(await readFile(path, 'utf8'));
+  const write = (path, value) => writeFile(join(stage, path), JSON.stringify(value, null, 2) + '\n');
+  const manifest = await json(join(stage, 'plugin.json'));
+  manifest.version = (await json('manifest.json')).version;
+  await write('plugin.json', manifest);
+  const config = await json(join(stage, 'mcp.json'));
+  Object.assign(config.mcpServers.gijiroku_mcp, {command, args});
+  await write('mcp.json', config);
   await mkdir('dist-chatgpt', {recursive:true});
-  await rm(output, {force:true});
-  execFileSync('/usr/bin/zip', ['-q', '-r', output, '.'], {cwd:stage, stdio:'inherit'});
+  await zipDirectory(stage, output);
   console.log(output);
 } finally { await rm(stage, {recursive:true, force:true}); }

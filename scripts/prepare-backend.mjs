@@ -3,14 +3,18 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {target, speechBinary as destination} from './mcp-package.mjs';
 
-if (process.platform !== 'darwin' || process.arch !== 'arm64') throw Error('対応環境はApple Silicon Macです');
+const backends = {
+ 'darwin-arm64':['-DCMAKE_OSX_ARCHITECTURES=arm64','-DGGML_METAL=ON','-DGGML_METAL_EMBED_LIBRARY=ON','-DGGML_VULKAN=OFF'],
+ // 静的CRTにして、Visual C++再頒布可能パッケージがない環境でも起動できるようにする。
+ 'windows-x64':['-DGGML_VULKAN=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'],
+};
 const repository = 'https://github.com/Z9RTM/speech.cpp.git';
 const pinned = process.env.SPEECH_COMMIT;
 if (pinned !== undefined && !/^[a-f0-9]{7}$/i.test(pinned)) throw Error('SPEECH_COMMITにコミットハッシュの先頭7桁を指定してください');
 const commit = pinned?.toLowerCase() ?? execFileSync('git',['ls-remote',repository,'refs/heads/main'],{encoding:'utf8'}).split(/\s/)[0];
 if (!/^[a-f0-9]{40}$/.test(commit) && !pinned) throw Error('speech.cppのmainブランチを解決できません');
-const destination = 'binaries/speech-aarch64-apple-darwin';
 const hash = data => createHash('sha256').update(data).digest('hex');
 // ビルド設定を変更した際も以前のバイナリを再利用しない。
 const recipe = hash(await readFile(new URL(import.meta.url)));
@@ -34,15 +38,15 @@ try {
   '-S',source,'-B',build,'-DCMAKE_BUILD_TYPE=Release',
   '-DBUILD_SHARED_LIBS=OFF','-DGGML_NATIVE=OFF','-DGGML_OPENMP=OFF',
   `-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${bin}`,`-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=${bin}`,
-  '-DCMAKE_OSX_ARCHITECTURES=arm64','-DGGML_METAL=ON','-DGGML_METAL_EMBED_LIBRARY=ON','-DGGML_VULKAN=OFF'
+  ...backends[target.name]
  ]);
  run('cmake',['--build',build,'--config','Release','--target','speech-cli','--parallel','4']);
- run(join(bin,'speech'),['--version']);
+ run(join(bin,`speech${target.exe}`),['--version']);
  await mkdir('binaries',{recursive:true});
  await mkdir('licenses',{recursive:true});
  await copyFile(join(source,'LICENSE'),'licenses/speech.cpp-LICENSE');
  await copyFile(join(source,'ggml','LICENSE'),'licenses/ggml-LICENSE');
- await copyFile(join(bin,'speech'),destination);
+ await copyFile(join(bin,`speech${target.exe}`),destination);
  await chmod(destination,0o755);
  await writeFile(`${destination}.json`,JSON.stringify({commit:resolved,recipe,binarySha:hash(await readFile(destination))}));
 } finally { await rm(dir,{recursive:true,force:true}); }
