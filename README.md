@@ -1,16 +1,37 @@
 # gijiroku-mcp
 
-Claude DesktopやChatGPTデスクトップのチャットからAIに頼むだけで、会議の録音開始から文字起こし、議事録の作成までを済ませるためのMac用のローカルMCPサーバーです。MCP Appsの操作画面も同梱しています。音声認識はRustサーバーから起動する同梱のspeech.cppが端末内で行います。
+Claude DesktopやChatGPTデスクトップのチャットからAIに頼むだけで、会議の録音開始から文字起こし、議事録の作成までを済ませるためのローカルMCPサーバーです。MCP Appsの操作画面も同梱しています。音声認識はRustサーバーから起動するspeech.cppが端末内で行います。
+
+## 対応環境
+
+gijiroku-mcpは3つの部品でできていて、部品ごとに対応するOSが違います。
+
+| 部品 | 役割 | 対応OS |
+| --- | --- | --- |
+| Rustサーバー（`src/main.rs`） | stdioのMCPサーバー。speech.cppとデータの場所を起動引数で受け取ります | macOS、Linux、Windows |
+| speech.cpp（[Z9RTM/speech.cpp](https://github.com/Z9RTM/speech.cpp)） | 音声認識とマイク入力 | macOS（Metal）、Linux（Vulkan / CPU）、Windows（Vulkan） |
+| パッケージ作成（`scripts/`） | speech.cppのビルドと、MCPB・プラグインZIPの作成 | macOS（Apple Silicon） |
+
+Rustサーバーは、`x86_64-apple-darwin`、`aarch64-apple-darwin`、`x86_64-unknown-linux-gnu`、`aarch64-unknown-linux-gnu`、`x86_64-pc-windows-msvc` 向けにコンパイルできます。
+
+| 環境 | 配布パッケージ | 使い方 |
+| --- | --- | --- |
+| macOS（Apple Silicon） | MCPB、ChatGPTプラグインZIP | パッケージをインストールします |
+| macOS（Intel）、Linux、Windows | なし | [ソースからビルドして使う](#ソースからビルドして使う)。実機での動作はまだ確認していません |
+
+ホストアプリ（Claude Desktop、ChatGPTデスクトップ）がどのOSで動くかは、それぞれのアプリに従います。
 
 ## 使い方
 
-1. MCPB（Claude Desktop）またはプラグインZIP（ChatGPTデスクトップ）をインストールします。
+1. 配布パッケージ（Claude DesktopはMCPB、ChatGPTデスクトップはプラグインZIP）をインストールします。パッケージがない環境では、[ソースからビルドして使う](#ソースからビルドして使う)の手順でMCPクライアントに登録します。
 2. チャットで「会議の文字起こしを始めて」「gijiroku-mcpの操作画面を開いて」などと頼みます。モデルが未取得なら、AIか画面の「モデルを準備」で先に取得します。
 3. 終わったら「停止して議事録にまとめて」と頼みます。AIは `read_transcript` で全文を読み、議事録を書きます。
 
-インストールしたり画面を開いたりしただけでは録音は始まりません。マイクの許可はホストアプリ（Claude Desktop / ChatGPT）に対して求められます。パネルを表示できないホストでも、すべての操作をツール呼び出しだけで行えます。
+インストールしたり画面を開いたりしただけでは録音は始まりません。macOSでは、マイクの許可はホストアプリ（Claude Desktop / ChatGPT）に対して求められます。パネルを表示できないホストでも、すべての操作をツール呼び出しだけで行えます。
 
 ### Claude Desktop（MCPB）
+
+配布しているMCPBが使える環境は、[対応環境](#対応環境)の表のとおりです。
 
 1. 設定のExtensions（拡張機能）→ Advanced settings → Install Extensionから `.mcpb` を選びます。項目名はClaudeのバージョンによって違うことがあります。
 2. 新しいチャットで「gijiroku-mcpの操作画面を開いて」と頼むと、`open_gijiroku` が画面を開きます。
@@ -106,6 +127,8 @@ FASTDIARは1フレームに1話者しか付けないため、重なった発話�
 
 ## データと制限
 
+保存先は、サーバーの2つ目の引数（録音とログ）と3つ目の引数（モデル）で決まります。配布パッケージは次の場所を使います。
+
 | 内容 | 場所 |
 | --- | --- |
 | モデル（両ホスト共通） | `~/Library/Application Support/gijiroku-mcp/models` |
@@ -120,11 +143,59 @@ FASTDIARは1フレームに1話者しか付けないため、重なった発話�
 - 接続終了、SIGTERM、SIGINTで子プロセスを止めます。サーバー自体がSIGKILLされたときやOSのクラッシュ時に止まる保証はありません。
 - 接続ごとに独立したサーバーなので、複数のチャットから同時に録音やモデル準備をしないでください。
 
-問題を切り分けるときは、macOSとホストアプリのバージョン、拡張のインストールとサーバー起動の成否、マイク許可の表示と「システム設定 → プライバシーとセキュリティ → マイク」に出たアプリ名、`recording_status` の operation / lastExit / log を記録してください。
+問題を切り分けるときは、OSとホストアプリのバージョン、拡張のインストールとサーバー起動の成否、マイク許可の表示（macOSでは「システム設定 → プライバシーとセキュリティ → マイク」に出たアプリ名）、`recording_status` の operation / lastExit / log を記録してください。
+
+## ソースからビルドして使う
+
+配布パッケージがない環境では、speech.cppとRustサーバーを別々にビルドして、MCPクライアントに登録します。Node.js 22以降、Rust 1.90、Git、CMake 3.20以降、C++17コンパイラが必要です。
+
+1. speech.cppのフォークを `main` ブランチで取得します。
+
+   ```sh
+   git clone --recurse-submodules https://github.com/Z9RTM/speech.cpp.git
+   cd speech.cpp
+   ```
+
+2. 環境に合うバックエンドでspeech.cppをビルドします。
+
+   | 環境 | 設定コマンド |
+   | --- | --- |
+   | macOS | `cmake -B build -DCMAKE_BUILD_TYPE=Release` |
+   | Linux、WindowsでGPUを使う | `cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON`（Vulkan SDKが必要） |
+   | LinuxでCPUだけを使う | `cmake -B build -DCMAKE_BUILD_TYPE=Release` |
+
+   ```sh
+   cmake --build build --config Release --target speech-cli
+   ```
+
+   実行ファイル `speech`（Windowsでは `speech.exe`）ができます。バックエンドの詳細はspeech.cppの `docs/install.md` にあります。
+
+3. このリポジトリでRustサーバーをビルドします。`target/release/gijiroku-mcp`（Windowsでは `gijiroku-mcp.exe`）ができます。
+
+   ```sh
+   pnpm install
+   pnpm run mcp:app:build
+   cargo build --locked --release
+   ```
+
+4. MCPクライアントの設定にサーバーを登録します。引数は順に、speech.cppの実行ファイル、録音とログの保存先、モデルの保存先です。
+
+   ```json
+   {
+     "mcpServers": {
+       "gijiroku-mcp": {
+         "command": "/path/to/gijiroku-mcp",
+         "args": ["/path/to/speech", "/path/to/gijiroku-mcp/data", "/path/to/gijiroku-mcp/models"]
+       }
+     }
+   }
+   ```
+
+5. チャットで「gijiroku-mcpのモデルを準備して」と頼み、完了してから録音を始めます。
 
 ## 開発・ビルド
 
-Node.js 22以降、Rust 1.90、Git、CMake 3.20以降、Xcode Command Line Toolsが必要です。
+ここのコマンドは、配布パッケージを作るためのものです。パッケージ作成はmacOS（Apple Silicon）でだけ動き、Xcode Command Line Toolsも必要です。Rustのテストは `/bin/sleep` を使うので、Windowsでは動きません。
 
 ```sh
 pnpm install
@@ -145,6 +216,6 @@ pnpm run chatgpt:test
 
 `cargo build` を直接実行する前には `pnpm run mcp:app:build` で画面をビルドしてください。パックとテストのコマンドは自動でこれを行います。バンドルの `licenses/` には、本体の `gijiroku-mcp-LICENSE`、speech.cppとggml、画面のSDKなど（`MCP-App-THIRD_PARTY_NOTICES.txt`）、Rustの依存クレート（`Rust-THIRD_PARTY_NOTICES.txt`、`Cargo.lock` から生成）のライセンスが入ります。
 
-パックするときは、FASTDIAR対応のspeech.cppフォーク（[Z9RTM/speech.cpp](https://github.com/Z9RTM/speech.cpp)）をソースからビルドし、`binaries/` に置いて同梱します。対象のコミットは `SPEECH_COMMIT` に先頭7桁で指定します（省略時は `eef1e9e`）。コミットかビルドスクリプトが変わったときだけ再ビルドします。コンパイラやSDKを変えたときは `binaries/` を削除してください。
+パックするときは、FASTDIAR対応のspeech.cppフォーク（[Z9RTM/speech.cpp](https://github.com/Z9RTM/speech.cpp)）をソースからビルドし、`binaries/` に置いて同梱します。既定では、パックするたびに `main` ブランチの最新コミットを確認します。特定のコミットに固定するときは、`SPEECH_COMMIT` にその先頭7桁を指定します。対象のコミットかビルドスクリプトが変わったときだけ再ビルドします。コンパイラやSDKを変えたときは `binaries/` を削除してください。
 
-サーバーとspeech.cppにはDeveloper ID署名も公証もしていません。MCPBにも署名はありません。
+macOS向けの配布パッケージでは、サーバーとspeech.cppにDeveloper ID署名も公証もしていません。MCPBにも署名はありません。

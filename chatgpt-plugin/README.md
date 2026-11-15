@@ -1,6 +1,6 @@
 # gijiroku-mcp: ChatGPTデスクトップ用プラグイン
 
-Mac用のローカルMCPプラグインです。MCPBと同じRustサーバー・speech.cpp・埋め込みMCP Apps画面を収録し、パッケージ形式と起動設定だけを変更しています。Node.jsやRustのインストールは利用時には不要です。
+ChatGPTデスクトップ用のローカルMCPプラグインです。このZIPが使える環境は、ルートREADMEの[対応環境](../README.md#対応環境)の表のとおりです。MCPBと同じRustサーバー・speech.cpp・埋め込みMCP Apps画面を収録し、パッケージ形式と起動設定だけを変更しています。Node.jsやRustのインストールは利用時には不要です。
 
 ## 生成
 
