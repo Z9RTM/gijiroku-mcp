@@ -16,9 +16,11 @@ Object.defineProperty(process, 'arch', {value: process.env.TEST_PLATFORM === 'da
 let bin;
 cp.execFileSync = (command, args) => {
  console.log(JSON.stringify([command,...args]));
+ if (args[0] === 'ls-remote') return (process.env.TEST_MAIN || '4d0278b' + '1'.repeat(33)) + '\\trefs/heads/main\\n';
  if (args.includes('rev-parse')) {
   if (process.env.SPEECH_COMMIT === 'badc0de') throw Error('ambiguous commit');
-  return (process.env.SPEECH_COMMIT || 'eef1e9e').toLowerCase() + '0'.repeat(33);
+  const ref = args.at(-1).split('^')[0];
+  return ref.length === 40 ? ref : ref + '0'.repeat(33);
  }
  if (args[0] === 'clone') {
   const source = args.at(-1);
@@ -52,13 +54,16 @@ for (const platform of ['darwin']) {
   try {
    let result = run();
    assert.equal(result.status, 0, result.stderr);
-   assert.match(result.stdout, /eef1e9e\^\{commit\}/);
+   assert.match(result.stdout, /"ls-remote","https:\/\/github.com\/Z9RTM\/speech.cpp.git","refs\/heads\/main"/);
+   assert.match(result.stdout, /4d0278b1{33}\^\{commit\}/);
    assert.match(result.stdout, /"submodule","update","--init","--recursive"/);
    assert.match(result.stdout, /"--target","speech-cli"/);
    assert.match(result.stdout, /GGML_METAL_EMBED_LIBRARY=ON/);
    assert.equal(await readFile(binary, 'utf8'), 'binary');
    assert.equal(await readFile(join(cwd, 'licenses/ggml-LICENSE'), 'utf8'), 'ggml license');
-   assert.equal(run('eef1e9e').stdout, '');
+   assert.doesNotMatch(run().stdout, /clone/, 'unchanged main reuses the build');
+   assert.match(run(undefined, {TEST_MAIN: 'c0ffee0' + '2'.repeat(33)}).stdout, /c0ffee02{33}\^\{commit\}/, 'moved main rebuilds');
+   assert.equal(run('c0ffee0').stdout, '', 'pinned prefix of the cached build skips git entirely');
    result = run('ABC1234');
    assert.equal(result.status, 0, result.stderr);
    assert.match(result.stdout, /abc1234\^\{commit\}/);
